@@ -9,7 +9,10 @@
 #
 # The defaults produce formulae for local testing (file:// URLs and the
 # local/octez tap, see local_tap.sh). For publishing, set --baseurl to where
-# the tarballs will be hosted and --tap to the published tap.
+# the tarballs will be hosted and --tap to the published tap. @TAG@ in
+# --baseurl is replaced by the release tag of each tarball: octez-v<version>,
+# or <name>-v<version> for packages with a fixed version (pkgdefs/*.version).
+# dist/assets.txt lists "tag tarball sha256" for each tarball, for publish.sh.
 
 set -eu
 
@@ -105,6 +108,7 @@ render() {
 [ -n "${VERSION}" ] || VERSION=$(octezVersion)
 echo "=> Octez version ${VERSION}"
 
+: > "${DIST}/assets.txt"
 for pkg in ${PACKAGES}; do
 	if [ -f "${defs}/${pkg}.version" ]; then
 		pkgversion=$(cat "${defs}/${pkg}.version")
@@ -163,8 +167,11 @@ for pkg in ${PACKAGES}; do
 
 	# Tarball
 	tarball="${pkg}-${pkgversion}-${ARCH}-macos.tar.gz"
+	# Reproducible: fixed timestamps and owners, no gzip timestamp
+	find "${stage}" -exec touch -h -t 200001010000 {} +
 	COPYFILE_DISABLE=1 tar -C "${DIST}/stage" --uid 0 --gid 0 \
-		-czf "${DIST}/${tarball}" "${stagename}"
+		--uname root --gname wheel -cf - "${stagename}" |
+		gzip -n > "${DIST}/${tarball}"
 	sha=$(shasum -a 256 "${DIST}/${tarball}" | awk '{print $1}')
 
 	# Dependencies: other formulae in the tap, then linked libraries
@@ -225,7 +232,13 @@ $(sed 's/^/      /' "${defs}/${pkg}.caveats")
 
 	T_CLASS=$(className "${pkg}")
 	T_DESC=$(cat "${defs}/${pkg}.desc")
-	T_URL="${BASEURL}/${tarball}"
+	if [ -f "${defs}/${pkg}.version" ]; then
+		tag="${pkg}-v${pkgversion}"
+	else
+		tag="octez-v${VERSION}"
+	fi
+	echo "${tag} ${tarball} ${sha}" >> "${DIST}/assets.txt"
+	T_URL="$(echo "${BASEURL}" | sed "s|@TAG@|${tag}|g")/${tarball}"
 	T_VERSION="${pkgversion}"
 	T_SHA256="${sha}"
 	T_DEPENDS="${depends}"

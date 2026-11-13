@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Packages Octez (Tezos) for Homebrew on macOS arm64 as **prebuilt binary tarballs plus formulae** (not casks, not source formulae, not bottles). Casks were rejected because they cannot define `brew services` and would need Apple notarization. This is the macOS sibling of `../pkg-builder` (APT/RPM). Its `pkgscripts/pkg-common/*.service` and `*.default` files are the reference for what each service runs. Keep behaviour aligned with them.
 
-Hosting and CI (publishing tarballs and a real `homebrew-*` tap repo) are not built yet. The defaults target local testing.
+The published tap is `github.com/drchrispinnock/homebrew-octez` (`brew tap drchrispinnock/octez`). Its tarballs are assets on that repo's GitHub Releases. There is no CI yet: build and publish run by hand on an arm64 Mac. The defaults of `make_pkgs.sh` target local testing.
 
 ## Commands
 
@@ -16,7 +16,14 @@ Hosting and CI (publishing tarballs and a real `homebrew-*` tap repo) are not bu
                [--baseurl URL] [--tap user/repo] [--packages "a b"] [--no-strip]
 ./local_tap.sh [tap] [formula-dir]    # Homebrew refuses loose formula files
 brew trust local/octez && brew install local/octez/octez-node
+
+# Publish (after build_octez.sh):
+./make_pkgs.sh --tap drchrispinnock/octez \
+  --baseurl 'https://github.com/drchrispinnock/homebrew-octez/releases/download/@TAG@'
+./publish.sh [--clobber] [--no-push]  # uploads assets, then pushes Formula/ to the tap
 ```
+
+`@TAG@` in `--baseurl` becomes each tarball's release tag: `octez-v<version>`, or `<name>-v<version>` for fixed-version data formulae. That way `zcash-params` and `dal-trusted-setup` live in their own releases and aren't re-uploaded with each Octez release. `make_pkgs.sh` writes `dist/assets.txt` (tag, tarball, sha256). Tarballs are reproducible (fixed mtimes, `gzip -n`), so rebuilding an unchanged data formula gives the same sha. `publish.sh` skips an asset whose GitHub `digest` matches, and fails on a mismatch unless `--clobber` is given. It uploads before it pushes, so a pushed formula never points at a missing asset. The tap checkout is `work/homebrew-octez`. Its README comes from `templates/tap-README.md` and is copied only if the tap doesn't have one yet.
 
 `build_octez.sh` clones into `work/tezos` (git-ignored). It uses a local opam switch and builds only the executables in `pkgdefs/*.binaries` with `make build PROFILE=release OCTEZ_EXECUTABLES=...`, then fetches the DAL trusted setup into `_opam/share`. It forces openssl@3 ahead of Homebrew's default openssl@4 because the opam `ssl` package breaks with OpenSSL 4.
 

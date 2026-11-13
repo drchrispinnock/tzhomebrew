@@ -40,6 +40,17 @@ brew install local/octez/octez-node
 brew services start octez-node
 ```
 
+## Publishing
+
+The tap is [drchrispinnock/homebrew-octez](https://github.com/drchrispinnock/homebrew-octez),
+with tarballs on its GitHub Releases:
+
+```
+./make_pkgs.sh --tap drchrispinnock/octez \
+  --baseurl 'https://github.com/drchrispinnock/homebrew-octez/releases/download/@TAG@'
+./publish.sh
+```
+
 ## Using the services
 
 Each service reads `$(brew --prefix)/etc/octez/<name>.conf`, a shell
