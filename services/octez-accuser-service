@@ -1,0 +1,12 @@
+#!/bin/sh
+# launchd wrapper for octez-accuser. Installed by the octez-accuser formula.
+PREFIX="@HOMEBREW_PREFIX@"
+CONF="$PREFIX/etc/octez/octez-accuser.conf"
+
+ENDPOINT="http://127.0.0.1:8732"
+RUNTIME_OPTS=""
+[ -f "$CONF" ] && . "$CONF"
+
+cd "$HOME" || exit 1
+# shellcheck disable=SC2086
+exec "$PREFIX/bin/octez-accuser" -E "$ENDPOINT" run -K $RUNTIME_OPTS

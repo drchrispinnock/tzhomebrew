@@ -1,0 +1,12 @@
+#!/bin/sh
+# launchd wrapper for the octez-baker VDF daemon. Installed by the octez-vdf formula.
+PREFIX="@HOMEBREW_PREFIX@"
+CONF="$PREFIX/etc/octez/octez-vdf.conf"
+
+ENDPOINT="http://127.0.0.1:8732"
+RUNTIME_OPTS=""
+[ -f "$CONF" ] && . "$CONF"
+
+cd "$HOME" || exit 1
+# shellcheck disable=SC2086
+exec "$PREFIX/bin/octez-baker" -E "$ENDPOINT" run vdf -K $RUNTIME_OPTS

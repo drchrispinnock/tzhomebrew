@@ -1,0 +1,12 @@
+#!/bin/sh
+# launchd wrapper for octez-dal-node. Installed by the octez-dal-node formula.
+PREFIX="@HOMEBREW_PREFIX@"
+CONF="$PREFIX/etc/octez/octez-dal-node.conf"
+
+DATADIR="$HOME/.tezos-dal-node"
+RUNTIME_OPTS=""
+[ -f "$CONF" ] && . "$CONF"
+
+cd "$HOME" || exit 1
+# shellcheck disable=SC2086
+exec "$PREFIX/bin/octez-dal-node" run --data-dir "$DATADIR" $RUNTIME_OPTS

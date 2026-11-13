@@ -1,0 +1,4 @@
+Before starting the service, initialise the node's data directory, e.g.:
+  octez-node config init --network mainnet --history-mode rolling
+  octez-node snapshot import <snapshot-file>
+Then edit #{etc}/octez/octez-node.conf.

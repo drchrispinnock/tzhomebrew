@@ -1,0 +1,36 @@
+#!/bin/sh
+# launchd wrapper for octez-baker. Installed by the octez-baker formula.
+PREFIX="@HOMEBREW_PREFIX@"
+CONF="$PREFIX/etc/octez/octez-baker.conf"
+
+MODE="local"
+DATADIR="$HOME/.tezos-node"
+ENDPOINT="http://127.0.0.1:8732"
+CLIENTDIR="$HOME/.tezos-client"
+KEYS=""
+DAL_OPTIONS="--without-dal"
+LQ_VOTE=""
+RUNTIME_OPTS=""
+[ -f "$CONF" ] && . "$CONF"
+
+if [ -z "$LQ_VOTE" ]; then
+  echo "octez-baker: LQ_VOTE is not set in $CONF" >&2
+  exit 1
+fi
+
+cd "$HOME" || exit 1
+# shellcheck disable=SC2086
+case "$MODE" in
+local)
+  exec "$PREFIX/bin/octez-baker" -d "$CLIENTDIR" run with local node "$DATADIR" \
+    $KEYS -K --liquidity-baking-toggle-vote "$LQ_VOTE" $RUNTIME_OPTS $DAL_OPTIONS
+  ;;
+remote)
+  exec "$PREFIX/bin/octez-baker" -d "$CLIENTDIR" -E "$ENDPOINT" run remotely \
+    $KEYS -K --liquidity-baking-toggle-vote "$LQ_VOTE" $RUNTIME_OPTS $DAL_OPTIONS
+  ;;
+*)
+  echo "octez-baker: MODE must be local or remote in $CONF (got '$MODE')" >&2
+  exit 1
+  ;;
+esac
