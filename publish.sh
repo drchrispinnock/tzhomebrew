@@ -51,6 +51,19 @@ if grep -L -F "${baseurl}" "${DIST}"/Formula/*.rb | grep -q .; then
 	exit 1
 fi
 
+# All tarballs must be here, including those copied from another machine
+missing=0
+while read -r tag tarball sha; do
+	if [ ! -f "${DIST}/${tarball}" ]; then
+		echo "Missing ${DIST}/${tarball}" >&2
+		missing=1
+	elif [ "$(shasum -a 256 "${DIST}/${tarball}" | awk '{print $1}')" != "${sha}" ]; then
+		echo "${DIST}/${tarball} does not match its manifest sha256" >&2
+		missing=1
+	fi
+done < "${DIST}/assets.txt"
+[ "${missing}" = "0" ] || exit 1
+
 # 1. Release assets
 #
 while read -r tag tarball sha; do

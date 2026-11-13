@@ -1,6 +1,7 @@
 #!/bin/sh
 #
-# Build Octez on macOS (arm64) ready for packaging with make_pkgs.sh.
+# Build Octez on macOS (arm64 or x86_64) ready for packaging with
+# make_pkgs.sh.
 #
 # The Octez tree is cloned into a work directory (default ./work/tezos) and
 # built with its own local opam switch. Only the executables listed in
@@ -16,12 +17,20 @@ WORKDIR="${here}/work/tezos"
 DEPLOYMENT_TARGET="14.0"
 SKIPDEPS=0
 CLEAN=0
+ARCH=$(uname -m)
+
+# Portable BLST avoids the ADX instructions that pre-Broadwell Intel CPUs
+# (2013-2014 Macs) lack. Apple Silicon does not need it.
+case "${ARCH}" in
+x86_64) BLSTPORTABLE=1 ;;
+*) BLSTPORTABLE=0 ;;
+esac
 
 usage() {
 	cat <<EOF
 Usage: $0 [--branch Branch|Tag|latest-release] [--repo GitURL]
           [--workdir Dir] [--deployment-target MacOSVersion]
-          [--skip-deps] [--clean]
+          [--skip-deps] [--clean] [--(no-)blst-portable]
 EOF
 	exit 1
 }
@@ -34,13 +43,18 @@ while [ $# -gt 0 ]; do
 	--deployment-target) DEPLOYMENT_TARGET="$2"; shift ;;
 	--skip-deps) SKIPDEPS=1 ;;
 	--clean) CLEAN=1 ;;
+	--blst-portable) BLSTPORTABLE=1 ;;
+	--no-blst-portable) BLSTPORTABLE=0 ;;
 	*) usage ;;
 	esac
 	shift
 done
 
 [ "$(uname -s)" = "Darwin" ] || { echo "This builds on macOS only" >&2; exit 1; }
-[ "$(uname -m)" = "arm64" ] || { echo "Only arm64 is supported for now" >&2; exit 1; }
+case "${ARCH}" in
+arm64 | x86_64) ;;
+*) echo "Unsupported architecture ${ARCH}" >&2; exit 1 ;;
+esac
 for tool in brew opam rustup git; do
 	command -v "$tool" > /dev/null || { echo "Missing $tool" >&2; exit 1; }
 done
@@ -88,6 +102,10 @@ export CPATH="${ossl}/include:${brewprefix}/include"
 export PKG_CONFIG_PATH="${ossl}/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
 export MACOSX_DEPLOYMENT_TARGET="${DEPLOYMENT_TARGET}"
 export OPAMYES=true
+if [ "${BLSTPORTABLE}" = "1" ]; then
+	export BLST_PORTABLE=yes
+	echo "=> Building with BLST_PORTABLE=yes"
+fi
 
 . ./scripts/version.sh
 rustup toolchain install "${recommended_rust_version}"

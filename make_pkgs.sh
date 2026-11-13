@@ -1,18 +1,19 @@
 #!/bin/sh
 #
-# Package a built Octez tree (see build_octez.sh) into tarballs and
-# Homebrew formulae.
+# Package a built Octez tree (see build_octez.sh) into tarballs for this
+# machine's architecture, then render the formulae (render_formulae.sh).
 #
 # Output:
-#   dist/<name>-<version>-arm64-macos.tar.gz
-#   dist/Formula/<name>.rb
+#   dist/<name>-<version>-<arch>-macos.tar.gz   Octez packages
+#   dist/<name>-<version>.tar.gz                 data packages (pkgdefs/*.version)
+#   dist/manifest-<arch>.txt                     what was packaged, for rendering
+#   dist/Formula/<name>.rb, dist/assets.txt      from render_formulae.sh
 #
-# The defaults produce formulae for local testing (file:// URLs and the
-# local/octez tap, see local_tap.sh). For publishing, set --baseurl to where
-# the tarballs will be hosted and --tap to the published tap. @TAG@ in
-# --baseurl is replaced by the release tag of each tarball: octez-v<version>,
-# or <name>-v<version> for packages with a fixed version (pkgdefs/*.version).
-# dist/assets.txt lists "tag tarball sha256" for each tarball, for publish.sh.
+# To publish arm64 and x86_64 together, build and package on each machine,
+# copy the other machine's manifest-<arch>.txt and tarballs into dist/, then
+# run render_formulae.sh (or this script again) and publish.sh.
+#
+# --tap, --baseurl and --revision are passed to render_formulae.sh.
 
 set -eu
 
@@ -20,19 +21,18 @@ here="$(cd "$(dirname "$0")" && pwd -P)"
 
 TREE="${here}/work/tezos"
 DIST="${here}/dist"
-BASEURL=""
-TAP="local/octez"
 VERSION=""
-REVISION=0
 PACKAGES="zcash-params dal-trusted-setup octez-client octez-node octez-baker octez-accuser octez-vdf octez-dal-node"
-ARCH="arm64"
+ARCH=$(uname -m)
 STRIP=1
+RENDER=1
+RENDERARGS=""
 
 usage() {
 	cat <<EOF
-Usage: $0 [--tree OctezTree] [--dist OutputDir] [--baseurl URL]
-          [--tap user/repo] [--version Version] [--revision N]
-          [--packages "pkg pkg ..."] [--no-strip]
+Usage: $0 [--tree OctezTree] [--dist OutputDir] [--version Version]
+          [--packages "pkg pkg ..."] [--no-strip] [--no-render]
+          [--baseurl URL] [--tap user/repo] [--revision N]
 EOF
 	exit 1
 }
@@ -41,23 +41,28 @@ while [ $# -gt 0 ]; do
 	case "$1" in
 	--tree) TREE="$2"; shift ;;
 	--dist) DIST="$2"; shift ;;
-	--baseurl) BASEURL="$2"; shift ;;
-	--tap) TAP="$2"; shift ;;
 	--version | -V) VERSION="$2"; shift ;;
-	--revision | -R) REVISION="$2"; shift ;;
 	--packages) PACKAGES="$2"; shift ;;
 	--no-strip) STRIP=0 ;;
+	--no-render) RENDER=0 ;;
+	--baseurl | --tap | --revision | -R)
+		RENDERARGS="${RENDERARGS} $1 $2"; shift ;;
 	*) usage ;;
 	esac
 	shift
 done
 
+case "${ARCH}" in
+arm64 | x86_64) ;;
+*) echo "Unsupported architecture ${ARCH}" >&2; exit 1 ;;
+esac
+
 TREE="$(cd "${TREE}" && pwd -P)"
-mkdir -p "${DIST}/Formula"
+mkdir -p "${DIST}"
 DIST="$(cd "${DIST}" && pwd -P)"
-BASEURL="${BASEURL:-file://${DIST}}"
 defs="${here}/pkgdefs"
 brewprefix=$(brew --prefix)
+manifest="${DIST}/manifest-${ARCH}.txt"
 
 # Octez version from the tree: octez-vX.Y[-rcN] -> X.Y[-rcN],
 # otherwise a development version.
@@ -68,12 +73,6 @@ octezVersion() {
 	octez-v*) echo "${_tag#octez-v}" ;;
 	*) echo "0.0.$(date '+%Y%m%d%H%M')-dev.$(git -C "${TREE}" rev-parse --short HEAD)" ;;
 	esac
-}
-
-# CamelCase class name from a formula name: octez-dal-node -> OctezDalNode
-#
-className() {
-	echo "$1" | awk -F- '{ for (i = 1; i <= NF; i++) printf "%s", toupper(substr($i,1,1)) substr($i,2) }'
 }
 
 # Homebrew formulae that the binaries link against, written to $1.
@@ -99,23 +98,28 @@ dylibDeps() {
 	fi
 }
 
-# Replace @TOKEN@ with the value of $T_TOKEN where it is set
-#
-render() {
-	perl -pe 's/@([A-Z0-9_]+)@/exists $ENV{"T_$1"} ? $ENV{"T_$1"} : $&/ge' "$1"
-}
-
 [ -n "${VERSION}" ] || VERSION=$(octezVersion)
-echo "=> Octez version ${VERSION}"
+echo "=> Octez version ${VERSION} (${ARCH})"
 
-: > "${DIST}/assets.txt"
+# Drop the manifest entries for the packages being rebuilt
+touch "${manifest}"
+awk -v pk=" ${PACKAGES} " 'index(pk, " " $1 " ") == 0' "${manifest}" > "${manifest}.new"
+mv "${manifest}.new" "${manifest}"
+
 for pkg in ${PACKAGES}; do
 	if [ -f "${defs}/${pkg}.version" ]; then
+		# Data package: same on every architecture
 		pkgversion=$(cat "${defs}/${pkg}.version")
+		pkgarch="all"
+		tag="${pkg}-v${pkgversion}"
+		tarball="${pkg}-${pkgversion}.tar.gz"
 	else
 		pkgversion="${VERSION}"
+		pkgarch="${ARCH}"
+		tag="octez-v${VERSION}"
+		tarball="${pkg}-${pkgversion}-${ARCH}-macos.tar.gz"
 	fi
-	echo "=> ${pkg} ${pkgversion}"
+	echo "=> ${pkg} ${pkgversion} (${pkgarch})"
 
 	stagename="${pkg}-${pkgversion}"
 	stage="${DIST}/stage/${stagename}"
@@ -166,7 +170,6 @@ for pkg in ${PACKAGES}; do
 	esac
 
 	# Tarball
-	tarball="${pkg}-${pkgversion}-${ARCH}-macos.tar.gz"
 	# Reproducible: fixed timestamps and owners, no gzip timestamp
 	find "${stage}" -exec touch -h -t 200001010000 {} +
 	COPYFILE_DISABLE=1 tar -C "${DIST}/stage" --uid 0 --gid 0 \
@@ -174,79 +177,24 @@ for pkg in ${PACKAGES}; do
 		gzip -n > "${DIST}/${tarball}"
 	sha=$(shasum -a 256 "${DIST}/${tarball}" | awk '{print $1}')
 
-	# Dependencies: other formulae in the tap, then linked libraries
-	depends=""
-	if [ -f "${defs}/${pkg}.depends" ]; then
-		for d in $(cat "${defs}/${pkg}.depends"); do
-			depends="${depends}  depends_on \"${TAP}/${d}\"
-"
-		done
-	fi
+	# Linked Homebrew libraries
+	deps="-"
 	if [ -d "${stage}/bin" ]; then
 		dylibDeps "${DIST}/stage/${pkg}.deps" "${stage}"/bin/*
-		for d in $(cat "${DIST}/stage/${pkg}.deps"); do
-			depends="${depends}  depends_on \"${d}\"
-"
-		done
+		if [ -s "${DIST}/stage/${pkg}.deps" ]; then
+			deps=$(paste -sd, "${DIST}/stage/${pkg}.deps")
+		fi
 	fi
 
-	# Service block
-	if [ -f "${stage}/libexec/${pkg}-service" ]; then
-		T_NAME="${pkg}"
-		export T_NAME
-		T_SERVICE=$(render "${here}/templates/service.rb.in")
-		T_SERVICE="${T_SERVICE}
-"
-	else
-		T_SERVICE=""
-	fi
-
-	# Caveats
-	if [ -f "${defs}/${pkg}.caveats" ]; then
-		T_CAVEATS="
-  def caveats
-    <<~EOS
-$(sed 's/^/      /' "${defs}/${pkg}.caveats")
-    EOS
-  end
-"
-	else
-		T_CAVEATS=""
-	fi
-
-	# Test
-	if [ -f "${defs}/${pkg}.binaries" ]; then
-		T_TEST="    system bin/\"$(head -1 "${defs}/${pkg}.binaries")\", \"--version\""
-	elif [ -f "${stage}/libexec/${pkg}-service" ]; then
-		T_TEST="    assert_path_exists libexec/\"${pkg}-service\""
-	else
-		T_TEST="    assert_path_exists share/\"${pkg}\""
-	fi
-
-	if [ "${REVISION}" -gt 0 ] && [ ! -f "${defs}/${pkg}.version" ]; then
-		T_REVISION="  revision ${REVISION}
-"
-	else
-		T_REVISION=""
-	fi
-
-	T_CLASS=$(className "${pkg}")
-	T_DESC=$(cat "${defs}/${pkg}.desc")
-	if [ -f "${defs}/${pkg}.version" ]; then
-		tag="${pkg}-v${pkgversion}"
-	else
-		tag="octez-v${VERSION}"
-	fi
-	echo "${tag} ${tarball} ${sha}" >> "${DIST}/assets.txt"
-	T_URL="$(echo "${BASEURL}" | sed "s|@TAG@|${tag}|g")/${tarball}"
-	T_VERSION="${pkgversion}"
-	T_SHA256="${sha}"
-	T_DEPENDS="${depends}"
-	export T_CLASS T_DESC T_URL T_VERSION T_SHA256 T_DEPENDS T_SERVICE \
-		T_CAVEATS T_TEST T_REVISION
-	render "${here}/templates/formula.rb.in" > "${DIST}/Formula/${pkg}.rb"
+	# name version arch tag tarball sha256 deps
+	echo "${pkg} ${pkgversion} ${pkgarch} ${tag} ${tarball} ${sha} ${deps}" >> "${manifest}"
 	echo "   ${tarball} ${sha}"
 done
 
 rm -rf "${DIST}/stage"
-echo "=> Formulae in ${DIST}/Formula (tap ${TAP})"
+echo "=> Manifest ${manifest}"
+
+if [ "${RENDER}" = "1" ]; then
+	# shellcheck disable=SC2086
+	"${here}/render_formulae.sh" --dist "${DIST}" ${RENDERARGS}
+fi
