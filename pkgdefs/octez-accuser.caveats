@@ -1,1 +1,3 @@
 Edit #{etc}/octez/octez-accuser.conf before starting the service.
+The service log, #{var}/log/octez/octez-accuser.log, only gets warnings
+(LOG_RULES in the conf file). Full logs are in ~/.tezos-client/logs/octez-accuser.

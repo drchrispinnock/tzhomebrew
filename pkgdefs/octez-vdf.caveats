@@ -1,1 +1,3 @@
 Edit #{etc}/octez/octez-vdf.conf before starting the service.
+The service log, #{var}/log/octez/octez-vdf.log, only gets warnings
+(LOG_RULES in the conf file). Full logs are in ~/.tezos-client/logs/octez-baker.

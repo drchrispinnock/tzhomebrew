@@ -66,6 +66,13 @@ go to `$(brew --prefix)/var/log/octez/<name>.log`. Data directories default
 to the Octez defaults (`~/.tezos-node`, `~/.tezos-client`,
 `~/.tezos-dal-node`).
 
+The service logs in `$(brew --prefix)/var/log/octez` are not rotated, so each
+service only writes warnings and errors there (`LOG_RULES` in its conf file,
+which sets `TEZOS_LOG`). Octez keeps 7 days of info-level logs itself: in
+`<data-dir>/daily_logs` for the node and DAL node, and in
+`~/.tezos-client/logs/octez-baker` or `octez-accuser` for the baker, VDF and
+accuser.
+
 `brew services start` runs a service as a LaunchAgent for the logged-in user.
 To run at boot as a dedicated user:
 `sudo brew services start --sudo-service-user tezos octez-node`.

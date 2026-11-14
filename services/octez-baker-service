@@ -11,7 +11,10 @@ KEYS=""
 DAL_OPTIONS="--without-dal"
 LQ_VOTE=""
 RUNTIME_OPTS=""
+LOG_RULES="warning"
 [ -f "$CONF" ] && . "$CONF"
+# Octez keeps its own rotated daily logs; launchd's log is not rotated
+[ -z "$LOG_RULES" ] || { TEZOS_LOG="$LOG_RULES"; export TEZOS_LOG; }
 
 if [ -z "$LQ_VOTE" ]; then
   echo "octez-baker: LQ_VOTE is not set in $CONF" >&2

@@ -2,3 +2,5 @@ Before starting the service, initialise the node's data directory, e.g.:
   octez-node config init --network mainnet --history-mode rolling
   octez-node snapshot import <snapshot-file>
 Then edit #{etc}/octez/octez-node.conf.
+The service log, #{var}/log/octez/octez-node.log, only gets warnings
+(LOG_RULES in the conf file). Full logs are in <data-dir>/daily_logs.

@@ -5,7 +5,10 @@ CONF="$PREFIX/etc/octez/octez-vdf.conf"
 
 ENDPOINT="http://127.0.0.1:8732"
 RUNTIME_OPTS=""
+LOG_RULES="warning"
 [ -f "$CONF" ] && . "$CONF"
+# Octez keeps its own rotated daily logs; launchd's log is not rotated
+[ -z "$LOG_RULES" ] || { TEZOS_LOG="$LOG_RULES"; export TEZOS_LOG; }
 
 cd "$HOME" || exit 1
 # shellcheck disable=SC2086

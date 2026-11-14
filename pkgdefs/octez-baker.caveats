@@ -2,3 +2,5 @@ You must set LQ_VOTE in #{etc}/octez/octez-baker.conf before starting
 the service. MODE selects a local node (data directory) or a remote node
 (RPC endpoint).
 A Mac that sleeps will miss baking slots; see `man pmset` and `man caffeinate`.
+The service log, #{var}/log/octez/octez-baker.log, only gets warnings
+(LOG_RULES in the conf file). Full logs are in <client-dir>/logs/octez-baker.
