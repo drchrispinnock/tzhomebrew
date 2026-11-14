@@ -51,7 +51,7 @@ To test the packaging without a real build, point `--tree` at a fake tree. It ne
 - The DAL trusted setup is 576 MB (g1 192 MB, g2 384 MB), so it is its own formula and `octez-dal-node` is about 49 MB.
 - Verified with stripped binaries: `octez-node` started as a LaunchAgent found the zcash params through `XDG_DATA_DIRS`, ran, and shut down cleanly on `brew services stop`.
 
-- **Published state:** the tap still serves the first layout: arm64 only, with data tarballs named `*-1.0.0-arm64-macos.tar.gz`. The next `publish.sh` uploads the arch-neutral data tarballs to the existing `*-v1.0.0` releases, and the arm64 Octez tarballs are skipped because their sha matches. The old data assets can be deleted afterwards.
+- **Published state:** octez-v25.3 for arm64 and x86_64 (tap commit 19eb487). Homebrew has no Intel bottles (Intel is Tier 3 since September 2026), so on Intel the linked libraries and their build tools (cmake etc.) are compiled from source at install time. We decided not to bundle them into the tarballs, so that Homebrew keeps updating them, not us.
 
 ## Homebrew 7 specifics (verified on 7.0.13)
 
