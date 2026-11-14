@@ -4,7 +4,7 @@
 # machine's architecture, then render the formulae (render_formulae.sh).
 #
 # Output:
-#   dist/<name>-<version>-<arch>-macos.tar.gz   Octez packages
+#   dist/<name>-<version>[_<rev>]-<arch>-macos.tar.gz   Octez packages
 #   dist/<name>-<version>.tar.gz                 data packages (pkgdefs/*.version)
 #   dist/manifest-<arch>.txt                     what was packaged, for rendering
 #   dist/Formula/<name>.rb, dist/assets.txt      from render_formulae.sh
@@ -13,7 +13,14 @@
 # copy the other machine's manifest-<arch>.txt and tarballs into dist/, then
 # run render_formulae.sh (or this script again) and publish.sh.
 #
-# --tap, --baseurl and --revision are passed to render_formulae.sh.
+# --revision N sets the Homebrew revision of the packages built, for a
+# repackaging of the same Octez version (e.g. a service change). It is part
+# of the tarball name, so a published tarball is never replaced.
+#
+# A data package whose tarball is already in dist/ is not rebuilt: its
+# version is fixed and its published sha256 must not change.
+#
+# --tap and --baseurl are passed to render_formulae.sh.
 
 set -eu
 
@@ -27,12 +34,13 @@ ARCH=$(uname -m)
 STRIP=1
 RENDER=1
 RENDERARGS=""
+REVISION=0
 
 usage() {
 	cat <<EOF
 Usage: $0 [--tree OctezTree] [--dist OutputDir] [--version Version]
           [--packages "pkg pkg ..."] [--no-strip] [--no-render]
-          [--baseurl URL] [--tap user/repo] [--revision N]
+          [--revision N] [--baseurl URL] [--tap user/repo]
 EOF
 	exit 1
 }
@@ -45,12 +53,17 @@ while [ $# -gt 0 ]; do
 	--packages) PACKAGES="$2"; shift ;;
 	--no-strip) STRIP=0 ;;
 	--no-render) RENDER=0 ;;
-	--baseurl | --tap | --revision | -R)
+	--revision | -R) REVISION="$2"; shift ;;
+	--baseurl | --tap)
 		RENDERARGS="${RENDERARGS} $1 $2"; shift ;;
 	*) usage ;;
 	esac
 	shift
 done
+
+case "${REVISION}" in
+'' | *[!0-9]*) echo "--revision must be a number" >&2; exit 1 ;;
+esac
 
 case "${ARCH}" in
 arm64 | x86_64) ;;
@@ -113,11 +126,23 @@ for pkg in ${PACKAGES}; do
 		pkgarch="all"
 		tag="${pkg}-v${pkgversion}"
 		tarball="${pkg}-${pkgversion}.tar.gz"
+		pkgrev=0
+		if [ -f "${DIST}/${tarball}" ]; then
+			sha=$(shasum -a 256 "${DIST}/${tarball}" | awk '{print $1}')
+			echo "=> ${pkg} ${pkgversion}: keeping existing ${tarball}"
+			echo "${pkg} ${pkgversion} ${pkgarch} ${tag} ${tarball} ${sha} - ${pkgrev}" >> "${manifest}"
+			continue
+		fi
 	else
 		pkgversion="${VERSION}"
 		pkgarch="${ARCH}"
 		tag="octez-v${VERSION}"
-		tarball="${pkg}-${pkgversion}-${ARCH}-macos.tar.gz"
+		pkgrev="${REVISION}"
+		if [ "${pkgrev}" -gt 0 ]; then
+			tarball="${pkg}-${pkgversion}_${pkgrev}-${ARCH}-macos.tar.gz"
+		else
+			tarball="${pkg}-${pkgversion}-${ARCH}-macos.tar.gz"
+		fi
 	fi
 	echo "=> ${pkg} ${pkgversion} (${pkgarch})"
 
@@ -170,10 +195,12 @@ for pkg in ${PACKAGES}; do
 	esac
 
 	# Tarball
-	# Reproducible: fixed timestamps and owners, no gzip timestamp
+	# Reproducible: fixed timestamps and owners, no gzip timestamp, and no
+	# extended attributes (macOS adds a per-machine com.apple.provenance)
 	find "${stage}" -exec touch -h -t 200001010000 {} +
 	COPYFILE_DISABLE=1 tar -C "${DIST}/stage" --uid 0 --gid 0 \
-		--uname root --gname wheel -cf - "${stagename}" |
+		--uname root --gname wheel --no-xattrs --no-acls --no-fflags \
+		--no-mac-metadata -cf - "${stagename}" |
 		gzip -n > "${DIST}/${tarball}"
 	sha=$(shasum -a 256 "${DIST}/${tarball}" | awk '{print $1}')
 
@@ -186,8 +213,8 @@ for pkg in ${PACKAGES}; do
 		fi
 	fi
 
-	# name version arch tag tarball sha256 deps
-	echo "${pkg} ${pkgversion} ${pkgarch} ${tag} ${tarball} ${sha} ${deps}" >> "${manifest}"
+	# name version arch tag tarball sha256 deps revision
+	echo "${pkg} ${pkgversion} ${pkgarch} ${tag} ${tarball} ${sha} ${deps} ${pkgrev}" >> "${manifest}"
 	echo "   ${tarball} ${sha}"
 done
 

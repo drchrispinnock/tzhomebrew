@@ -21,11 +21,10 @@ here="$(cd "$(dirname "$0")" && pwd -P)"
 DIST="${here}/dist"
 BASEURL=""
 TAP="local/octez"
-REVISION=0
 
 usage() {
 	cat <<EOF
-Usage: $0 [--dist Dir] [--baseurl URL] [--tap user/repo] [--revision N]
+Usage: $0 [--dist Dir] [--baseurl URL] [--tap user/repo]
 EOF
 	exit 1
 }
@@ -35,7 +34,6 @@ while [ $# -gt 0 ]; do
 	--dist) DIST="$2"; shift ;;
 	--baseurl) BASEURL="$2"; shift ;;
 	--tap) TAP="$2"; shift ;;
-	--revision | -R) REVISION="$2"; shift ;;
 	*) usage ;;
 	esac
 	shift
@@ -189,8 +187,16 @@ $(sed 's/^/      /' "${defs}/${pkg}.caveats")
 		T_TEST="    assert_path_exists share/\"${pkg}\""
 	fi
 
-	if [ "${REVISION}" -gt 0 ] && [ -z "${all}" ]; then
-		T_REVISION="  revision ${REVISION}
+	# Revision (manifest field 8, from make_pkgs.sh --revision): the highest
+	# of the architectures, so both see the same formula version
+	revision=0
+	for e in "${arm}" "${intel}"; do
+		[ -n "${e}" ] || continue
+		r=$(field "${e}" 8)
+		[ "${r:-0}" -gt "${revision}" ] && revision="${r}"
+	done
+	if [ "${revision}" -gt 0 ] && [ -z "${all}" ]; then
+		T_REVISION="  revision ${revision}
 "
 	else
 		T_REVISION=""
