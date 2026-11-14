@@ -6,6 +6,7 @@
 # --component selects the tree and packages as in build_octez.sh:
 #   octez  work/tezos, release tag octez-v<version>
 #   srn    work/tezos-srn, release tag octez-smart-rollup-node-v<version>
+#   evm    work/tezos-evm, release tag octez-evm-node-v<version>
 #
 # Output:
 #   dist/<name>-<version>[_<rev>]-<arch>-macos.tar.gz   Octez packages
@@ -43,7 +44,7 @@ REVISION=0
 
 usage() {
 	cat <<EOF
-Usage: $0 [--component octez|srn] [--tree OctezTree] [--dist OutputDir] [--version Version]
+Usage: $0 [--component octez|srn|evm] [--tree OctezTree] [--dist OutputDir] [--version Version]
           [--packages "pkg pkg ..."] [--no-strip] [--no-render]
           [--revision N] [--baseurl URL] [--tap user/repo]
 EOF
@@ -86,6 +87,10 @@ srn)
 	tagprefix="octez-smart-rollup-node-v"
 	[ -n "${TREE}" ] || TREE="${here}/work/tezos-srn"
 	;;
+evm)
+	tagprefix="octez-evm-node-v"
+	[ -n "${TREE}" ] || TREE="${here}/work/tezos-evm"
+	;;
 *) echo "Unknown component ${COMPONENT}" >&2; exit 1 ;;
 esac
 
@@ -121,8 +126,8 @@ brewprefix=$(brew --prefix)
 manifest="${DIST}/manifest-${ARCH}.txt"
 
 # Version from the tree's tag: <tagprefix>X -> X (octez-v25.3 -> 25.3,
-# octez-smart-rollup-node-v20260724 -> 20260724), otherwise a development
-# version.
+# octez-smart-rollup-node-v20260724 -> 20260724, octez-evm-node-v0.68 ->
+# 0.68), otherwise a development version.
 #
 octezVersion() {
 	_tag=$(git -C "${TREE}" describe --tags --exact-match 2> /dev/null || true)

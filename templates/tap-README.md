@@ -36,6 +36,7 @@ the Octez binaries come prebuilt.
 | `octez-dal-node`    | octez-dal-node (service)                        |
 | `octez-signer`      | octez-signer (HTTP signer service)              |
 | `octez-smart-rollup-node` | octez-smart-rollup-node (service)         |
+| `octez-evm-node`    | octez-evm-node (observer service)               |
 | `zcash-params`      | Sapling parameters                              |
 | `dal-trusted-setup` | DAL trusted setup                               |
 

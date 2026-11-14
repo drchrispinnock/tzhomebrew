@@ -1,0 +1,21 @@
+#!/bin/sh
+# launchd wrapper for octez-evm-node (observer). Installed by the
+# octez-evm-node formula.
+PREFIX="@HOMEBREW_PREFIX@"
+CONF="$PREFIX/etc/octez/octez-evm-node.conf"
+
+DATADIR="$HOME/.octez-evm-node"
+RPCADDR="127.0.0.1"
+RPCPORT="8545"
+ENDPOINT="http://127.0.0.1:8932"
+RUNTIME_OPTS=""
+LOG_RULES="warning"
+[ -f "$CONF" ] && . "$CONF"
+# Octez keeps its own rotated daily logs; launchd's log is not rotated
+[ -z "$LOG_RULES" ] || { TEZOS_LOG="$LOG_RULES"; export TEZOS_LOG; }
+
+cd "$HOME" || exit 1
+# shellcheck disable=SC2086
+exec "$PREFIX/bin/octez-evm-node" run observer \
+  --rollup-node-endpoint "$ENDPOINT" --rpc-addr "$RPCADDR" --rpc-port "$RPCPORT" \
+  --data-dir "$DATADIR" $RUNTIME_OPTS

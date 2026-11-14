@@ -12,6 +12,8 @@
 #   srn    smart rollup node, versioned separately: SRNBRANCH from
 #          latest-releases.env, tree work/tezos-srn (a git worktree of
 #          work/tezos when that exists)
+#   evm    EVM node, versioned separately: EVMBRANCH from
+#          latest-releases.env, tree work/tezos-evm (likewise)
 
 set -eu
 
@@ -35,7 +37,7 @@ esac
 
 usage() {
 	cat <<EOF
-Usage: $0 [--component octez|srn] [--branch Branch|Tag|latest-release] [--repo GitURL]
+Usage: $0 [--component octez|srn|evm] [--branch Branch|Tag|latest-release] [--repo GitURL]
           [--workdir Dir] [--deployment-target MacOSVersion]
           [--skip-deps] [--clean] [--(no-)blst-portable]
 EOF
@@ -69,6 +71,13 @@ srn)
 		BRANCH="${SRNBRANCH}"
 	fi
 	[ -n "${WORKDIR}" ] || WORKDIR="${here}/work/tezos-srn"
+	;;
+evm)
+	if [ -z "${BRANCH}" ]; then
+		. "${here}/latest-releases.env"
+		BRANCH="${EVMBRANCH}"
+	fi
+	[ -n "${WORKDIR}" ] || WORKDIR="${here}/work/tezos-evm"
 	;;
 *) echo "Unknown component ${COMPONENT}" >&2; exit 1 ;;
 esac

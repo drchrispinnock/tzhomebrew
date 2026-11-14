@@ -21,6 +21,7 @@ formulae install binaries built once by `build_octez.sh`.
 | `octez-dal-node` | octez-dal-node, depends on dal-trusted-setup | yes   |
 | `octez-signer`   | octez-signer (HTTP)                        | yes     |
 | `octez-smart-rollup-node` | octez-smart-rollup-node, versioned separately | yes |
+| `octez-evm-node` | octez-evm-node (observer), versioned separately | yes |
 
 ## Building
 
@@ -34,6 +35,10 @@ formulae install binaries built once by `build_octez.sh`.
 # tree (work/tezos-srn) and version, e.g. 20260724
 ./build_octez.sh --component srn
 ./make_pkgs.sh --component srn
+
+# EVM node: likewise with EVMBRANCH, work/tezos-evm, e.g. 0.68
+./build_octez.sh --component evm
+./make_pkgs.sh --component evm
 ```
 
 Run these on each architecture. `make_pkgs.sh` packages for the machine it runs

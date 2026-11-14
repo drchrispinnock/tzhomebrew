@@ -1,0 +1,7 @@
+The service runs an observer, following a smart rollup node at ENDPOINT
+(default http://127.0.0.1:8932). Edit #{etc}/octez/octez-evm-node.conf
+before starting it, e.g. set RUNTIME_OPTS="--network mainnet
+--init-from-snapshot" for a fresh data directory. For a sequencer or other
+modes, run octez-evm-node yourself.
+The service log, #{var}/log/octez/octez-evm-node.log, only gets warnings
+(LOG_RULES in the conf file). Full logs are in <data-dir>/daily_logs.
