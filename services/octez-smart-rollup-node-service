@@ -1,0 +1,18 @@
+#!/bin/sh
+# launchd wrapper for octez-smart-rollup-node. Installed by the
+# octez-smart-rollup-node formula.
+PREFIX="@HOMEBREW_PREFIX@"
+CONF="$PREFIX/etc/octez/octez-smart-rollup-node.conf"
+
+DATADIR="$HOME/.tezos-smart-rollup-node"
+CLIENTDIR="$HOME/.tezos-client"
+RUNTIME_OPTS=""
+LOG_RULES="warning"
+[ -f "$CONF" ] && . "$CONF"
+# Octez keeps its own rotated daily logs; launchd's log is not rotated
+[ -z "$LOG_RULES" ] || { TEZOS_LOG="$LOG_RULES"; export TEZOS_LOG; }
+
+cd "$HOME" || exit 1
+# shellcheck disable=SC2086
+exec "$PREFIX/bin/octez-smart-rollup-node" -d "$CLIENTDIR" run \
+  --data-dir "$DATADIR" $RUNTIME_OPTS

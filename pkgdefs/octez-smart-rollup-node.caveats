@@ -1,0 +1,6 @@
+Before starting the service, configure the rollup node, e.g.:
+  octez-smart-rollup-node init observer config for <rollup-address> \
+    with operators --data-dir ~/.tezos-smart-rollup-node
+Then edit #{etc}/octez/octez-smart-rollup-node.conf.
+The service log, #{var}/log/octez/octez-smart-rollup-node.log, only gets
+warnings (LOG_RULES in the conf file). Full logs are in <data-dir>/daily_logs.

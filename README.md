@@ -19,6 +19,8 @@ formulae install binaries built once by `build_octez.sh`.
 | `octez-vdf`      | service only, depends on octez-baker       | yes     |
 | `dal-trusted-setup` | DAL SRS files (`share/dal-trusted-setup`) |       |
 | `octez-dal-node` | octez-dal-node, depends on dal-trusted-setup | yes   |
+| `octez-signer`   | octez-signer (HTTP)                        | yes     |
+| `octez-smart-rollup-node` | octez-smart-rollup-node, versioned separately | yes |
 
 ## Building
 
@@ -27,6 +29,11 @@ formulae install binaries built once by `build_octez.sh`.
 ./build_octez.sh --branch octez-v25.3
 ./make_pkgs.sh                         # tarballs, manifest + formulae in dist/
 ./make_pkgs.sh --no-strip              # keep symbol tables
+
+# Smart rollup node: its own branch (SRNBRANCH in latest-releases.env),
+# tree (work/tezos-srn) and version, e.g. 20260724
+./build_octez.sh --component srn
+./make_pkgs.sh --component srn
 ```
 
 Run these on each architecture. `make_pkgs.sh` packages for the machine it runs

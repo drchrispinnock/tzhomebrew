@@ -1,0 +1,8 @@
+Before starting the service, create or import keys in the signer's base
+directory (DATADIR in #{etc}/octez/octez-signer.conf), e.g.:
+  octez-signer -d ~/.tezos-signer gen keys mykey
+The service serves HTTP on 127.0.0.1:6732 by default. Edit
+#{etc}/octez/octez-signer.conf to listen elsewhere, enable the high
+watermark check (HWM_CHECK) and restrict the magic bytes it will sign.
+The service log, #{var}/log/octez/octez-signer.log, only gets warnings
+(LOG_RULES in the conf file). Full logs are in <base-dir>/logs/octez-signer.

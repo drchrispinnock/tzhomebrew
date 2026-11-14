@@ -11,8 +11,8 @@ The published tap is `github.com/drchrispinnock/homebrew-octez` (`brew tap drchr
 ## Commands
 
 ```sh
-./build_octez.sh [--branch octez-vX.Y] [--repo URL] [--skip-deps] [--clean] [--(no-)blst-portable]
-./make_pkgs.sh [--tree work/tezos] [--version V] [--packages "a b"] [--no-strip] [--no-render] \
+./build_octez.sh [--component octez|srn] [--branch octez-vX.Y] [--repo URL] [--skip-deps] [--clean] [--(no-)blst-portable]
+./make_pkgs.sh [--component octez|srn] [--tree work/tezos] [--version V] [--packages "a b"] [--no-strip] [--no-render] \
                [--revision N] [--baseurl URL] [--tap user/repo]   # last two go to render_formulae.sh
 ./render_formulae.sh [--dist dist] [--baseurl URL] [--tap user/repo]
 ./local_tap.sh [tap] [formula-dir]    # Homebrew refuses loose formula files
@@ -37,6 +37,8 @@ The work is split across machines:
 To test the packaging without a real build, point `--tree` at a fake tree. It needs the binaries (any Mach-O files), `_opam/share/zcash-params/*.params`, `_opam/share/dal-trusted-setup/srsu_zcash_g{1,2}` and `src/bin_client/bash-completion.sh`.
 
 ## Architecture
+
+- **Components:** a package belongs to the `octez` component unless `pkgdefs/<pkg>.component` says otherwise. Each component has its own tree, branch, version and release tag. `octez` builds in `work/tezos` from the latest `octez-vX.Y` tag and is released as `octez-v<version>`. `srn` (`octez-smart-rollup-node`) builds in `work/tezos-srn` from `SRNBRANCH` in `latest-releases.env`, the same setting as in `../pkg-builder`. That tree is a git worktree of `work/tezos` with its own opam switch. The SRN is built for arm64 only, by choice, so its formula gets `depends_on arch: :arm64`. Its version comes from the tag, so `octez-smart-rollup-node-v20260724` gives version `20260724` and that release tag. `build_octez.sh` and `make_pkgs.sh` take `--component` and handle only that component's binaries and packages. `render_formulae.sh` checks for mixed versions within a component, grouping entries by their tag prefix.
 
 - **`pkgdefs/<formula>.*`** declares each package. `.binaries` lists files copied from the Octez tree root into `bin/`. `.desc` is the formula description. `.depends` lists formulae in the same tap, rendered as `depends_on "<tap>/<name>"`. `.caveats` holds the caveats text, which may use `#{etc}`. `.version` gives a fixed version that overrides the Octez version. The data-only formulae `zcash-params` and `dal-trusted-setup` are `1.0.0`, so Octez upgrades don't download them again; bump the version only if the files change. Data files (zcash params, DAL setup, client completion) are special-cased in the `case` in `make_pkgs.sh`. Service, caveats and test blocks are decided at render time from `services/` and `pkgdefs/`, not from the tarball.
 - **Library dependencies are auto-detected.** `otool -L` on each binary maps `$(brew --prefix)/opt/<formula>/...` to `depends_on "<formula>"`. Any other non-system path (Cellar, `/opt/homebrew/lib`, `@rpath`) fails the build on purpose.

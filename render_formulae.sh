@@ -47,10 +47,16 @@ ls "${DIST}"/manifest-*.txt > /dev/null 2>&1 ||
 	{ echo "No manifests in ${DIST}; run make_pkgs.sh" >&2; exit 1; }
 manifests() { cat "${DIST}"/manifest-*.txt; }
 
-# All architecture-specific packages must be the same Octez version
-versions=$(manifests | awk '$3 != "all" { print $2 }' | sort -u)
-if [ "$(echo "${versions}" | wc -l)" -gt 1 ]; then
-	echo "Manifests mix Octez versions:" ${versions} >&2
+# Within a component (release tag prefix: the tag less its version), all
+# architecture-specific packages must be the same version
+mixed=$(manifests | awk '$3 != "all" {
+	p = substr($4, 1, length($4) - length($2))
+	if (p in v && v[p] != $2) { print p ": " v[p] " and " $2 }
+	v[p] = $2
+}')
+if [ -n "${mixed}" ]; then
+	echo "Manifests mix versions:" >&2
+	echo "${mixed}" >&2
 	exit 1
 fi
 

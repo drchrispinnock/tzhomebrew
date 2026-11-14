@@ -1,0 +1,21 @@
+#!/bin/sh
+# launchd wrapper for octez-signer. Installed by the octez-signer formula.
+PREFIX="@HOMEBREW_PREFIX@"
+CONF="$PREFIX/etc/octez/octez-signer.conf"
+
+DATADIR="$HOME/.tezos-signer"
+ADDRESS="127.0.0.1"
+PORT="6732"
+HWM_CHECK=""
+MAGIC_BYTES=""
+RUNTIME_OPTS=""
+LOG_RULES="warning"
+[ -f "$CONF" ] && . "$CONF"
+# Octez keeps its own rotated daily logs; launchd's log is not rotated
+[ -z "$LOG_RULES" ] || { TEZOS_LOG="$LOG_RULES"; export TEZOS_LOG; }
+
+cd "$HOME" || exit 1
+# shellcheck disable=SC2086
+exec "$PREFIX/bin/octez-signer" --base-dir "$DATADIR" \
+  launch http signer --address "$ADDRESS" --port "$PORT" \
+  $MAGIC_BYTES $HWM_CHECK $RUNTIME_OPTS

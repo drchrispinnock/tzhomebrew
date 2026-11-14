@@ -34,6 +34,8 @@ the Octez binaries come prebuilt.
 | `octez-accuser`     | accuser service                                 |
 | `octez-vdf`         | VDF service                                     |
 | `octez-dal-node`    | octez-dal-node (service)                        |
+| `octez-signer`      | octez-signer (HTTP signer service)              |
+| `octez-smart-rollup-node` | octez-smart-rollup-node (service)         |
 | `zcash-params`      | Sapling parameters                              |
 | `dal-trusted-setup` | DAL trusted setup                               |
 

@@ -3,17 +3,24 @@
 # Build Octez on macOS (arm64 or x86_64) ready for packaging with
 # make_pkgs.sh.
 #
-# The Octez tree is cloned into a work directory (default ./work/tezos) and
-# built with its own local opam switch. Only the executables listed in
+# The Octez tree is cloned into a work directory and built with its own
+# local opam switch. Only the executables of the component's packages in
 # pkgdefs/*.binaries are built.
+#
+# Components (pkgdefs/<pkg>.component, default octez):
+#   octez  main Octez release, latest octez-vX.Y tag, tree work/tezos
+#   srn    smart rollup node, versioned separately: SRNBRANCH from
+#          latest-releases.env, tree work/tezos-srn (a git worktree of
+#          work/tezos when that exists)
 
 set -eu
 
 here="$(cd "$(dirname "$0")" && pwd -P)"
 
 REPO="https://gitlab.com/tezos/tezos.git"
-BRANCH="latest-release"
-WORKDIR="${here}/work/tezos"
+COMPONENT="octez"
+BRANCH=""
+WORKDIR=""
 DEPLOYMENT_TARGET="14.0"
 SKIPDEPS=0
 CLEAN=0
@@ -28,7 +35,7 @@ esac
 
 usage() {
 	cat <<EOF
-Usage: $0 [--branch Branch|Tag|latest-release] [--repo GitURL]
+Usage: $0 [--component octez|srn] [--branch Branch|Tag|latest-release] [--repo GitURL]
           [--workdir Dir] [--deployment-target MacOSVersion]
           [--skip-deps] [--clean] [--(no-)blst-portable]
 EOF
@@ -37,6 +44,7 @@ EOF
 
 while [ $# -gt 0 ]; do
 	case "$1" in
+	--component | -C) COMPONENT="$2"; shift ;;
 	--branch | -B) BRANCH="$2"; shift ;;
 	--repo) REPO="$2"; shift ;;
 	--workdir) WORKDIR="$2"; shift ;;
@@ -50,6 +58,30 @@ while [ $# -gt 0 ]; do
 	shift
 done
 
+case "${COMPONENT}" in
+octez)
+	[ -n "${BRANCH}" ] || BRANCH="latest-release"
+	[ -n "${WORKDIR}" ] || WORKDIR="${here}/work/tezos"
+	;;
+srn)
+	if [ -z "${BRANCH}" ]; then
+		. "${here}/latest-releases.env"
+		BRANCH="${SRNBRANCH}"
+	fi
+	[ -n "${WORKDIR}" ] || WORKDIR="${here}/work/tezos-srn"
+	;;
+*) echo "Unknown component ${COMPONENT}" >&2; exit 1 ;;
+esac
+
+# Packages of a component: pkgdefs/<pkg>.component, octez when absent
+componentOf() {
+	if [ -f "${here}/pkgdefs/$1.component" ]; then
+		cat "${here}/pkgdefs/$1.component"
+	else
+		echo octez
+	fi
+}
+
 [ "$(uname -s)" = "Darwin" ] || { echo "This builds on macOS only" >&2; exit 1; }
 case "${ARCH}" in
 arm64 | x86_64) ;;
@@ -61,9 +93,15 @@ done
 
 # Fetch the source
 #
-if [ ! -d "${WORKDIR}/.git" ]; then
+maintree="${here}/work/tezos"
+if [ ! -e "${WORKDIR}/.git" ]; then
 	mkdir -p "$(dirname "${WORKDIR}")"
-	git clone "${REPO}" "${WORKDIR}"
+	if [ "${WORKDIR}" != "${maintree}" ] && [ -d "${maintree}/.git" ]; then
+		# Share the objects of the main clone
+		git -C "${maintree}" worktree add --detach "${WORKDIR}"
+	else
+		git clone "${REPO}" "${WORKDIR}"
+	fi
 fi
 cd "${WORKDIR}"
 git fetch -q --tags origin
@@ -115,12 +153,17 @@ if [ "${SKIPDEPS}" = "0" ]; then
 fi
 eval "$(opam env --switch="${WORKDIR}" --set-switch)"
 
-executables=$(cat "${here}"/pkgdefs/*.binaries | sort -u | tr '\n' ' ')
+executables=$(for b in "${here}"/pkgdefs/*.binaries; do
+	pkg=$(basename "${b}" .binaries)
+	if [ "$(componentOf "${pkg}")" = "${COMPONENT}" ]; then cat "${b}"; fi
+done | sort -u | tr '\n' ' ')
 echo "=> Building: ${executables}"
 make build PROFILE=release OCTEZ_EXECUTABLES="${executables}"
 
 # The DAL trusted setup is downloaded into the opam switch
 #
-./scripts/install_dal_trusted_setup.sh
+if [ "${COMPONENT}" = "octez" ]; then
+	./scripts/install_dal_trusted_setup.sh
+fi
 
 echo "=> Build complete in ${WORKDIR}"

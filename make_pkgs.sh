@@ -3,6 +3,10 @@
 # Package a built Octez tree (see build_octez.sh) into tarballs for this
 # machine's architecture, then render the formulae (render_formulae.sh).
 #
+# --component selects the tree and packages as in build_octez.sh:
+#   octez  work/tezos, release tag octez-v<version>
+#   srn    work/tezos-srn, release tag octez-smart-rollup-node-v<version>
+#
 # Output:
 #   dist/<name>-<version>[_<rev>]-<arch>-macos.tar.gz   Octez packages
 #   dist/<name>-<version>.tar.gz                 data packages (pkgdefs/*.version)
@@ -26,10 +30,11 @@ set -eu
 
 here="$(cd "$(dirname "$0")" && pwd -P)"
 
-TREE="${here}/work/tezos"
+COMPONENT="octez"
+TREE=""
 DIST="${here}/dist"
 VERSION=""
-PACKAGES="zcash-params dal-trusted-setup octez-client octez-node octez-baker octez-accuser octez-vdf octez-dal-node"
+PACKAGES=""
 ARCH=$(uname -m)
 STRIP=1
 RENDER=1
@@ -38,7 +43,7 @@ REVISION=0
 
 usage() {
 	cat <<EOF
-Usage: $0 [--tree OctezTree] [--dist OutputDir] [--version Version]
+Usage: $0 [--component octez|srn] [--tree OctezTree] [--dist OutputDir] [--version Version]
           [--packages "pkg pkg ..."] [--no-strip] [--no-render]
           [--revision N] [--baseurl URL] [--tap user/repo]
 EOF
@@ -47,6 +52,7 @@ EOF
 
 while [ $# -gt 0 ]; do
 	case "$1" in
+	--component | -C) COMPONENT="$2"; shift ;;
 	--tree) TREE="$2"; shift ;;
 	--dist) DIST="$2"; shift ;;
 	--version | -V) VERSION="$2"; shift ;;
@@ -70,6 +76,43 @@ arm64 | x86_64) ;;
 *) echo "Unsupported architecture ${ARCH}" >&2; exit 1 ;;
 esac
 
+# Release tag prefix of a component; the tag is <prefix><version>
+case "${COMPONENT}" in
+octez)
+	tagprefix="octez-v"
+	[ -n "${TREE}" ] || TREE="${here}/work/tezos"
+	;;
+srn)
+	tagprefix="octez-smart-rollup-node-v"
+	[ -n "${TREE}" ] || TREE="${here}/work/tezos-srn"
+	;;
+*) echo "Unknown component ${COMPONENT}" >&2; exit 1 ;;
+esac
+
+# Packages of a component: pkgdefs/<pkg>.component, octez when absent
+componentOf() {
+	if [ -f "${here}/pkgdefs/$1.component" ]; then
+		cat "${here}/pkgdefs/$1.component"
+	else
+		echo octez
+	fi
+}
+
+if [ -z "${PACKAGES}" ]; then
+	for d in "${here}"/pkgdefs/*.desc; do
+		pkg=$(basename "${d}" .desc)
+		if [ "$(componentOf "${pkg}")" = "${COMPONENT}" ]; then
+			PACKAGES="${PACKAGES} ${pkg}"
+		fi
+	done
+fi
+for pkg in ${PACKAGES}; do
+	if [ "$(componentOf "${pkg}")" != "${COMPONENT}" ]; then
+		echo "${pkg} is in component $(componentOf "${pkg}"), not ${COMPONENT}" >&2
+		exit 1
+	fi
+done
+
 TREE="$(cd "${TREE}" && pwd -P)"
 mkdir -p "${DIST}"
 DIST="$(cd "${DIST}" && pwd -P)"
@@ -77,13 +120,14 @@ defs="${here}/pkgdefs"
 brewprefix=$(brew --prefix)
 manifest="${DIST}/manifest-${ARCH}.txt"
 
-# Octez version from the tree: octez-vX.Y[-rcN] -> X.Y[-rcN],
-# otherwise a development version.
+# Version from the tree's tag: <tagprefix>X -> X (octez-v25.3 -> 25.3,
+# octez-smart-rollup-node-v20260724 -> 20260724), otherwise a development
+# version.
 #
 octezVersion() {
 	_tag=$(git -C "${TREE}" describe --tags --exact-match 2> /dev/null || true)
 	case "${_tag}" in
-	octez-v*) echo "${_tag#octez-v}" ;;
+	"${tagprefix}"*) echo "${_tag#"${tagprefix}"}" ;;
 	*) echo "0.0.$(date '+%Y%m%d%H%M')-dev.$(git -C "${TREE}" rev-parse --short HEAD)" ;;
 	esac
 }
@@ -112,7 +156,7 @@ dylibDeps() {
 }
 
 [ -n "${VERSION}" ] || VERSION=$(octezVersion)
-echo "=> Octez version ${VERSION} (${ARCH})"
+echo "=> ${COMPONENT} version ${VERSION} (${ARCH})"
 
 # Drop the manifest entries for the packages being rebuilt
 touch "${manifest}"
@@ -136,7 +180,7 @@ for pkg in ${PACKAGES}; do
 	else
 		pkgversion="${VERSION}"
 		pkgarch="${ARCH}"
-		tag="octez-v${VERSION}"
+		tag="${tagprefix}${VERSION}"
 		pkgrev="${REVISION}"
 		if [ "${pkgrev}" -gt 0 ]; then
 			tarball="${pkg}-${pkgversion}_${pkgrev}-${ARCH}-macos.tar.gz"
