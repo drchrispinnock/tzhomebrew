@@ -134,15 +134,18 @@ for pkg in $(manifests | awk '!seen[$1]++ { print $1 }'); do
 			: > "${tmp}/intelonly"
 			echo "  depends_on arch: :x86_64" >> "${tmp}/depends"
 		fi
-		if [ -n "${arm}" ]; then
+		if [ -z "${arm}" ] || [ -z "${intel}" ]; then
+			# One architecture: the url must be at the top level, because
+			# brew tap loads every formula as each OS and architecture and
+			# rejects one with no url. depends_on arch stops the install.
+			srcLines "${arm:-${intel}}" "  " >> "${tmp}/sources"
+		else
 			{
 				echo "  on_arm do"
 				srcLines "${arm}" "    "
 				sed 's/.*/    depends_on "&"/' "${tmp}/armonly"
 				echo "  end"
 			} >> "${tmp}/sources"
-		fi
-		if [ -n "${intel}" ]; then
 			{
 				echo "  on_intel do"
 				srcLines "${intel}" "    "
